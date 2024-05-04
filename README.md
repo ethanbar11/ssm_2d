@@ -12,9 +12,10 @@ Then run:
 pip install --r requirments.txt
 ```
 
-## Recreating experiments results
 
-### Supported datasets
+# Experiments Recreation
+
+## Supported datasets
 
 - CIFAR-10
 - CIFAR-100
@@ -24,7 +25,7 @@ pip install --r requirments.txt
 - Tiny-ImageNet  
 - ImageNet-1k
 
-# Experiments Recreation
+
 
 ## Vit Backbones
 
