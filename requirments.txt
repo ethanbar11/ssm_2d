@@ -1,0 +1,12 @@
+numpy
+sympy
+wandb
+pandas
+colorama
+tensorboard
+einops
+timm
+wandb
+omegaconf
+matplotlib
+tqdm
