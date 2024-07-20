@@ -80,7 +80,6 @@ class TwoDimensionalSSM(nn.Module):
         self.scale = math.sqrt(1.0 / self.ndim)
         self.kernel_dim = args.directions_amount * self.n_ssm
 
-        # TODO: Change this where we'll work with other benchmarks
         self.one_side_length = math.ceil(math.sqrt(L))
         self.coeff_calc = CoeffCalculator(self.one_side_length)
         self.coeff_calc.calc_coeffs_lazy(force=force_coeff_calc)
@@ -105,7 +104,6 @@ class TwoDimensionalSSM(nn.Module):
                     matrix = matrix.type(torch.complex64)
                 self.matrices[key][symbol] = matrix.cuda()
 
-        # self.save_kernel = save_path
         self.last_kernel = None
         self.C_dimensions = self.embed_dim * self.directions_amount
         # H x N
@@ -161,8 +159,6 @@ class TwoDimensionalSSM(nn.Module):
         self.tpu = False
         self.whole_output_last_time = None
 
-        # TODO: DELETE, only for speed improvement
-        self.kernel_raw = nn.Parameter(torch.rand((2, 1024, 5, 4, 16)))
 
     def prepare_for_onnx_export_(self):
         self.onnx_trace = True
@@ -250,16 +246,15 @@ class TwoDimensionalSSM(nn.Module):
                       'axis (H n_ssm_multiplied_by_kernel_corners) N ->'  # Embed dim 96 N_ssm =2 directions =4 (96 *4)
                       'axis H n_ssm_multiplied_by_kernel_corners N',
                       n_ssm_multiplied_by_kernel_corners=self.n_ssm * self.directions_amount)
+        
         # C shape: axis X (embed_dim // (n_ssm * directions)) X (n_ssm * directions) X N
-        # output = einsum(outputs, C, 'direction patches n_ssm N, directions  n_ssm N -> patches n_ssm')
         output = einsum(x_matrix, C, 'axis patches n_ssm_directions N, axis H  n_ssm_directions N '
                                      '-> patches H n_ssm_directions')
-        # output2 = einsum(x_matrix, C, 'axis patches n_ssm_directions N, axis H  n_ssm_directions N '
-        #                              '-> axis patches H n_ssm_directions')
-        # output3 = output2[0] + output2[1]
         output = rearrange(output, 'patches H n_ssm_directions -> patches (H n_ssm_directions)')
 
         output = output.view(self.one_side_length, self.one_side_length, self.C_dimensions)
+
+        # Normalization fix, please refer to the paper for more details.
         output[0, :, :, ] *= 2
         output[:, 0, :, ] *= 2
         output[0, 0] /= 4
@@ -284,6 +279,8 @@ class TwoDimensionalSSM(nn.Module):
                 padding elements are indicated by 1s.
         """
         assert self.directions_amount > 1
+
+        # Firstly, we check x's shape, and then we rearrange it to the desired shape.
         if len(x.shape) == 3:
             # Expecting L x B x D
             seq_len, bsz, embed_dim = x.size()
@@ -303,22 +300,27 @@ class TwoDimensionalSSM(nn.Module):
             raise TypeError(
                 'Tensor inserted into 2-D SSM should be 3 dimensional (Length Batch Channels) or 4 dimensional (Batch '
                 'Dimension Length Length)')
+        
+        # Afterwards, we create the kernel from the cached matrices. Notice that the kernel amount is multiplied by 2 or 4,
+        # Because we create the kernel for each direction (2 or 4 is the hyper-parameter directions_amount).
+
         # D x L
         k = self.kernel().permute(2, 0, 1)  # (Directions * N_SSM) x kernel_size x kernel_size
-        if k.shape[-1] < fft_len:
-            # print("! Padding")
+        if k.shape[-1] < fft_len: # Sometimes, the kernel is smaller than the input image, we pad it.
             padding_amount = fft_len - k.shape[-1]
             k = torch.nn.functional.pad(k, (0, padding_amount, 0, padding_amount))
+
+
         s = 0
         out = None
+        
         # Split kernels to four directions
         k_f_s = torch.fft.rfft2(k.float(), s=(2 * fft_len, 2 * fft_len))
 
-        # kernels = list(
-        #     torch.split(k, [self.embed_dim for i in range(self.directions_amount)],
-        #                 dim=0))  # 4 kernels, one for each direction.
-        # Transform Kernels from L x L x n_ssm -> L x L x H
-        # kernels = [torch.fft.rfft2(k.float(), s=(2 * fft_len, 2 * fft_len)) for k in kernels]
+        """
+        The following part is just FFT convolution. We split the input to four directions, and then we apply the FFT
+        convolution for each direction. Finally, we sum the results.
+        """
         if self.directions_amount == 4:
             flip_dims = [[], [-2], [-1], [-2, -1]]
         else:
@@ -336,8 +338,9 @@ class TwoDimensionalSSM(nn.Module):
             else:
                 out += curr_after_flip
         out = out.type_as(x)
+        
         if len(residual.shape) == 3:
             out = rearrange(out, 'b d l1 l2 -> (l1 l2) b d ')
         if self.use_residual:
             out += residual
-        return self.normalization(out)  # notice normalization might be the identity function.
+        return self.normalization(out)  
