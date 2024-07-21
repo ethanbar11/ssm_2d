@@ -154,11 +154,11 @@ def init_parser():
 
     parser.add_argument('--is_SPT', action='store_true', help='Shifted Patch Tokenization')
 
-    parser.add_argument('--n_ssm', type=int, default=1, help='number of internal ssms')
+    parser.add_argument('--n_ssm', type=int, default=1, help='number of internal ssms. In general, H is supposed to serve as the number of internal SSMs, but it is a common practice to create lower amount of actual SSMs. Thus, the params shape are: A_1... A_4 \in [number of directions * N_ssm], B_1, B_2 \in [number of directions * N_ssm, N,2], C in [number of directions * H, N,], D \in [H]')
     parser.add_argument('--complex_ssm', action='store_true', default=False, help='Use complex ssm')
     parser.add_argument('--use_positional_encoding', type=bool, default=False, help='Use complex ssm')
 
-    parser.add_argument('--directions_amount', type=int, default=4, help='number directions, can be 2 or 4')
+    parser.add_argument('--directions_amount', type=int, default=4, help='number directions, can be 2 or 4. In order to allow bidirectional causality, we flip the kernels in 2 directions (two opposite corners of the image) or 4 (all the corners).')
     parser.add_argument('--save_kernels_and_exit', type=bool, default=False, help='Should')
     parser.add_argument('--dataset_percentage', type=float, default=1.0, help='Should')
 
