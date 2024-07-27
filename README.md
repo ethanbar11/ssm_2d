@@ -17,7 +17,6 @@ pip install --r requirments.txt
 
 ## Supported datasets
 
-- CIFAR-10
 - CIFAR-100
 - CIFAR-100-224px - CIFAR-100 images enhanced to 224x224, so it would be compatible with some of the architectures.
 - Celebs-A
@@ -58,7 +57,7 @@ To create original results from: https://juliusruseckas.github.io/ml/convnext-ci
 Notice original results are with batch-size = 128
 
 ```bash
-python main.py --model convnext-small --dataset CIFAR10 --lr 1e-3 --batch_size 128 --weight-decay 1e-1
+python main.py --model convnext-small --dataset CIFAR100 --lr 1e-3 --batch_size 128 --weight-decay 1e-1
 python main.py --model convnext-small --dataset T-IMNET --lr 1e-3 --batch_size 128 --weight-decay 1e-1
 ```
 
